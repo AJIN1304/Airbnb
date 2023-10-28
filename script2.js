@@ -1,31 +1,24 @@
 const cardContainer = document.getElementById("cardContainer");
-getData(searchPlace.place, searchPlace.checkIn, searchPlace.checkOut, searchPlace.guests);
-
+const limitErr = "You have exceeded the rate limit per minute for your plan, BASIC, by the API provider";
 const options = {
     method: 'GET',
     headers: {
-        'X-RapidAPI-Key': '35529e50acmshe42c2bf03c7e96dp12989cjsn06b3989d95a2',
+        'X-RapidAPI-Key': 'c5014a6b6emsh84288eb75db9f9fp1759f6jsn73c5e567590c',
+        // 'X-RapidAPI-Key': '35529e50acmshe42c2bf03c7e96dp12989cjsn06b3989d95a2',
         'X-RapidAPI-Host': 'airbnb13.p.rapidapi.com'
     }
 };
+const apiObject = JSON.parse(localStorage.getItem("searchObject"));
+document.title = `Airbnb | ${apiObject.place} - Holiday Rentals & Places to Stay`
 
-async function getData(place, checkIn, checkOut, guests) {
-    const url = 'https://airbnb13.p.rapidapi.com/search-location?location=' + place + '&checkin=' + checkIn + '&checkout=' + checkOut + '&adults=' + guests + '&children=0&infants=0&pets=0&page=1&currency=INR';
-    fetch(url, options)
-        .then(response => response.json())
-        .then((response) => {
-            console.log(response);
 
-            for (let i = 0; i < response.results.length; i++) {
-                createCard(response.results[i].hostThumbnail, response.results[i].type, response.results[i].rating, response.results[i].reviewsCount, response.results[i].name);
-            }
-
-        })
-        .catch(err => console.error(err));
+async function getAPIdata(place, checkIn, checkOut, guests) {
+    const url = `https://airbnb13.p.rapidapi.com/search-location?location=${place}&checkin=${checkIn}&checkout=${checkOut}&adults=${guests}&children=0&infants=0&pets=0&page=1&currency=INR`;
+    return fetch(url, options)
 }
 
 
-function createCard(thumbNail, hotelType, ratings, reviewsCount, hotelName, noBeds, stayDates, prize) {
+function createCard(thumbNail, hotelType, ratings, reviewsCount, hotelName, noBeds, noBedrooms, prize) {
     let card = document.createElement("div");
     card.classList.add("my-card");
 
@@ -62,89 +55,96 @@ function createCard(thumbNail, hotelType, ratings, reviewsCount, hotelName, noBe
     card.appendChild(hotelNameTag);
 
     let beds = document.createElement("p");
-    beds.innerText = noBeds;
+    beds.innerText = noBeds + " Beds" + " - " + noBedrooms + " Bedrooms";
     card.appendChild(beds);
 
-    let dates = document.createElement("p");
-    dates.innerText = stayDates;
-    card.appendChild(dates);
+    // let dates = document.createElement("p");
+    // dates.innerText = stayDates;
+    // card.appendChild(dates);
 
     let priceDisplay = document.createElement("div");
     priceDisplay.classList.add("prize-display");
-    priceDisplay.innerText = prize
+    priceDisplay.innerText = "₹" + prize
     card.appendChild(priceDisplay);
 
     cardContainer.appendChild(card);
 }
+
+function formatDate(checkIn, checkOut) {
+    const startDate = new Date(checkIn);
+    const endDate = new Date(checkOut);
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    const inday = startDate.getDate();
+    const inmonthIdx = startDate.getMonth();
+    const inmonth = monthNames[inmonthIdx];
+
+    const outday = endDate.getDate();
+    const outmonthIdx = endDate.getMonth();
+    const outmonth = monthNames[outmonthIdx];
+
+    if (inmonth === outmonth) {
+        return `${inday}-${outday} ${outmonth}`;
+    } else {
+        return `${inday} ${inmonth} - ${outday} ${outmonth}`;
+    }
+}
+
+
 
 
 
 
 // ******************** Google maps logic *******************//
 
+async function initMap() {
+    try {
+        const map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 10.5,
+            center: { lat: 12.972442, lng: 77.580643 },
+            streetViewControl: false,
+            zoomControl: true,
+            zoomControlOptions: {
+                position: google.maps.ControlPosition.RIGHT_TOP
+            },
+            fullscreenControl: true,
+            fullscreenControlOptions: {
+                position: google.maps.ControlPosition.LEFT_TOP
+            },
+            mapTypeControl: false,
+            rotateControl: false
+        })
+        // const response = await getAPIdata(apiObject.place, apiObject.checkIn, apiObject.checkOut, apiObject.guests)
+        const data = await response.json();
+        if (data.message !== limitErr) {
+            console.log(data);
+            for (let i = 0; i < data.results.length; i++) {
+                createCard(data.results[i].images[0], data.results[i].type, data.results[i].rating, data.results[i].reviewsCount, data.results[i].name, data.results[i].beds, data.results[i].bedrooms, data.results[i].price.rate);
+                setMarkers(map, data.results[i].lat, data.results[i].lng, JSON.stringify(data.results[i].name));
+            }
+        }
+    } catch (err) {
+        console.log(err);
+    }
 
-/**
-       //@license
-        * Copyright 2019 Google LLC. All Rights Reserved.
-        * SPDX-License-Identifier: Apache-2.0
-        */
-// The following example creates complex markers to indicate beaches near
-// Sydney, NSW, Australia. Note that the anchor is set to (0,32) to correspond
-// to the base of the flagpole.
-
-
-
-
-function initMap() {
-    const map = new google.maps.Map(document.getElementById("map"), {
-        zoom: 11,
-        center: { lat: 12.972442, lng: 77.580643 },
-    });
-
-    setMarkers(map);
 }
 
-// Data for the markers consisting of a name, a LatLng and a zIndex for the
-// order in which these markers should display on top of each other.
 
-
-
-function setMarkers(map) {
+function setMarkers(map, lat, lng, title) {
+    console.log(title);
 
     // Adds markers to the map.
     // Marker sizes are expressed as a Size of X,Y where the origin of the image
     // (0,0) is located in the top left of the image.
     // Origins, anchor positions and coordinates of the marker increase in the X
     // direction to the right and in the Y direction down.
-    const image = {
-        url: "https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png",
-        // This marker is 20 pixels wide by 32 pixels high.
-        size: new google.maps.Size(20, 32),
-        // The origin for this image is (0, 0).
-        origin: new google.maps.Point(0, 0),
-        // The anchor for this image is the base of the flagpole at (0, 32).
-        anchor: new google.maps.Point(0, 32),
-    };
-    // Shapes define the clickable region of the icon. The type defines an HTML
-    // <area> element 'poly' which traces out a polygon as a series of X,Y points.
-    // The final coordinate closes the poly by connecting to the first coordinate.
-    const shape = {
-        coords: [1, 1, 1, 20, 18, 20, 18, 1],
-        type: "poly",
-    };
 
-    for (let i = 0; i < beaches.length; i++) {
-        const beach = beaches[i];
-
-        new google.maps.Marker({
-            position: { lat: beach[1], lng: beach[2] },
-            map,
-            icon: image,
-            shape: shape,
-            title: beach[0],
-            zIndex: beach[3],
-        });
-    }
+    new google.maps.Marker({
+        position: { lat: lat, lng: lng },
+        // label: b,
+        map,
+        title: title,
+    });
 }
 
 window.initMap = initMap;
